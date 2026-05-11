@@ -1,0 +1,30 @@
+[Unit]
+Description=HermesV2 - Personal AI Agent (Claude Max Subscription)
+After=network-online.target ollama.service
+Wants=ollama.service network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/hermesv2
+# `claude` is installed globally by npm; include the npm global bin dir
+Environment="PATH=/home/pi/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="HOME=/home/pi"
+# Secrets - put real values in /etc/hermesv2.env (mode 600) and uncomment:
+# EnvironmentFile=/etc/hermesv2.env
+ExecStart=/usr/bin/python3 -m hermesv2 start
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+StandardOutput=append:/home/pi/hermesv2/logs/service.log
+StandardError=append:/home/pi/hermesv2/logs/service.err
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
