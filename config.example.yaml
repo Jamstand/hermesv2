@@ -1,0 +1,91 @@
+agent:
+  name: "HermesV2"
+  owner: "Josh"
+  data_dir: "data"
+  log_dir: "logs"
+
+llm:
+  primary: "llama"
+  fallback: "claude_max"
+
+  llama_url: "http://localhost:11434"
+  llama_model: "llama3"
+
+  claude:
+    model: "sonnet"
+    timeout: 300
+    max_calls_per_window: 30
+    window_seconds: 300
+
+memory:
+  db_path: "data/memory.db"
+  fts_enabled: true
+
+skills:
+  dir: "skills"
+  auto_create: true
+  auto_dir: "skills/auto"
+  max_auto_skills: 50
+  max_proposals_per_day: 5
+  hot_reload: true
+
+personality:
+  dir: "personalities"
+  default: "default"
+
+learner:
+  enabled: true
+  cron: "0 */6 * * *"
+
+gateways:
+  cli:
+    enabled: true
+
+  discord:
+    enabled: false
+    token: "${DISCORD_BOT_TOKEN}"
+    prefix: "!"
+    allowed_users: []
+
+  telegram:
+    enabled: false
+    token: "${TELEGRAM_BOT_TOKEN}"
+    allowed_chat_ids: []
+
+  webhook:
+    enabled: false
+    port: 8080
+    api_key: "${WEBHOOK_API_KEY}"
+    dashboard: true
+
+scheduler:
+  enabled: true
+  jobs:
+    - skill: system_check
+      cron: "0 8 * * *"
+      deliver_to:
+        - { gateway: discord, channel_id: "REPLACE_ME" }
+
+    - skill: marketplace_monitor
+      cron: "*/15 * * * *"
+      deliver_to:
+        - { gateway: discord, channel_id: "REPLACE_ME" }
+
+    - skill: s15_hunter
+      cron: "0 9,15,21 * * *"
+      deliver_to:
+        - { gateway: discord, channel_id: "REPLACE_ME" }
+
+tools:
+  shell:
+    enabled: true
+    require_approval: true
+    allowlist:
+      - "ls"
+      - "df"
+      - "free"
+      - "vcgencmd"
+      - "systemctl status"
+      - "ping"
+      - "uptime"
+      - "uname"

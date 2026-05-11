@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermesv2"
+version = "0.1.0"
+description = "Personal AI agent platform driven by Claude Max via the claude CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Josh", email = "vans@vans-it.local" }]
+license = { text = "MIT" }
+dependencies = [
+    "discord.py>=2.3.0",
+    "python-telegram-bot>=21.0,<22",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "prompt_toolkit>=3.0.43",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "psutil>=5.9.0",
+    "PyYAML>=6.0",
+    "apscheduler>=3.10.0",
+    "ddgs>=6.0",
+    "aiohttp>=3.9.0",
+    "click>=8.1.0",
+    "rich>=13.7.0",
+    "watchdog>=3.0.0",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+hermesv2 = "hermesv2.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hermesv2*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
