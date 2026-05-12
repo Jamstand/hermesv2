@@ -165,8 +165,9 @@ def run_all(config_path: str = "config.yaml") -> bool:
     cfg: dict = {}
     if cfg_path.exists():
         try:
-            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
+            from hermesv2.agent import load_config
+            cfg = load_config(cfg_path)
+        except Exception:
             cfg = {}
 
     llama_url = cfg.get("llm", {}).get("llama_url", "http://localhost:11434")

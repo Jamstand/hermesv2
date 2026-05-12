@@ -101,6 +101,56 @@ def test_memory_fts_handles_special_chars(tmp_path: Path):
     assert "bashrc" in ctx
 
 
+def test_load_config_resolves_paths_against_config_dir(tmp_path: Path, monkeypatch):
+    """Regression: relative paths in config.yaml used to resolve against cwd,
+    so `hermesv2 --config ~/hermesv2/config.yaml` run from `~` looked for
+    `~/skills`, crashing watchdog with `FileNotFoundError [Errno 2]`.
+
+    Now they resolve against the config file's directory.
+    """
+    from hermesv2.agent import load_config
+
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "config.yaml").write_text(
+        "agent:\n  data_dir: data\n  log_dir: logs\n"
+        "skills:\n  dir: skills\n  auto_dir: skills/auto\n"
+        "personality:\n  dir: personalities\n",
+        encoding="utf-8",
+    )
+
+    # Run from an unrelated cwd to prove resolution is config-relative, not
+    # cwd-relative.
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    monkeypatch.chdir(other)
+
+    cfg = load_config(project / "config.yaml")
+
+    assert cfg["agent"]["data_dir"] == str(project / "data")
+    assert cfg["agent"]["log_dir"] == str(project / "logs")
+    assert cfg["skills"]["dir"] == str(project / "skills")
+    assert cfg["skills"]["auto_dir"] == str(project / "skills" / "auto")
+    assert cfg["personality"]["dir"] == str(project / "personalities")
+    # db_path defaults under data_dir, also absolute
+    assert cfg["memory"]["db_path"] == str(project / "data" / "memory.db")
+
+
+def test_load_config_keeps_absolute_paths(tmp_path: Path):
+    """Absolute paths in config must be left alone (e.g. production /var/lib)."""
+    from hermesv2.agent import load_config
+
+    abs_skills = tmp_path / "global_skills"
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        f"skills:\n  dir: {abs_skills}\n",
+        encoding="utf-8",
+    )
+
+    cfg = load_config(cfg_file)
+    assert cfg["skills"]["dir"] == str(abs_skills)
+
+
 def test_hot_reload_handler_ignores_open_close_events(tmp_path: Path):
     """Regression: the watchdog handler used to subscribe via on_any_event,
     which catches FileOpenedEvent / FileClosedEvent / FileClosedNoWriteEvent.

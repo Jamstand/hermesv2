@@ -38,9 +38,49 @@ def _expand_env(obj: Any) -> Any:
     return obj
 
 
+def _resolve_paths(config: dict[str, Any], base: Path) -> dict[str, Any]:
+    """Resolve relative path values in `config` against `base` (the directory
+    containing the config file). Absolute paths are left untouched.
+
+    Without this, running `hermesv2 --config ~/hermesv2/config.yaml` from
+    `~` resolves `skills.dir: "skills"` to `~/skills` (cwd-relative), which
+    crashes watchdog's inotify with ENOENT.
+    """
+    def _abs(p: str) -> str:
+        pp = Path(p)
+        return str(pp) if pp.is_absolute() else str(base / pp)
+
+    config.setdefault("agent", {})
+    config["agent"]["data_dir"] = _abs(config["agent"].get("data_dir", "data"))
+    config["agent"]["log_dir"] = _abs(config["agent"].get("log_dir", "logs"))
+
+    config.setdefault("memory", {})
+    if "db_path" in config["memory"]:
+        config["memory"]["db_path"] = _abs(config["memory"]["db_path"])
+    else:
+        config["memory"]["db_path"] = str(
+            Path(config["agent"]["data_dir"]) / "memory.db"
+        )
+
+    config.setdefault("skills", {})
+    config["skills"]["dir"] = _abs(config["skills"].get("dir", "skills"))
+    config["skills"]["auto_dir"] = _abs(
+        config["skills"].get("auto_dir", "skills/auto")
+    )
+
+    config.setdefault("personality", {})
+    config["personality"]["dir"] = _abs(
+        config["personality"].get("dir", "personalities")
+    )
+
+    return config
+
+
 def load_config(path: str | Path) -> dict[str, Any]:
-    raw = Path(path).read_text(encoding="utf-8")
-    return _expand_env(yaml.safe_load(raw))
+    p = Path(path).resolve()
+    raw = p.read_text(encoding="utf-8")
+    config = _expand_env(yaml.safe_load(raw)) or {}
+    return _resolve_paths(config, p.parent)
 
 
 class HermesV2:

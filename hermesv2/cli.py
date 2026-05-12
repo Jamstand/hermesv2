@@ -17,10 +17,10 @@ console = Console()
 def _setup_logging(config_path: Path) -> None:
     log_dir = Path("logs")
     try:
-        import yaml
         if config_path.exists():
-            cfg = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-            log_dir = Path(cfg.get("agent", {}).get("log_dir", "logs"))
+            from hermesv2.agent import load_config
+            cfg = load_config(config_path)
+            log_dir = Path(cfg["agent"]["log_dir"])
     except Exception:
         pass
     log_dir.mkdir(parents=True, exist_ok=True)
