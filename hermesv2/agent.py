@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import signal
+import time
 from pathlib import Path
 from typing import Any
 
@@ -155,15 +156,44 @@ class HermesV2:
         engine = self.skills
 
         class _Handler(FileSystemEventHandler):
-            def on_any_event(self, event):
-                if event.is_directory:
+            # Subscribe only to discrete state-change events. NOT on_any_event:
+            # that catches FileOpenedEvent / FileClosedEvent / etc., which
+            # engine.reload() itself fires when it reads each .md file,
+            # producing an infinite reload loop.
+            def __init__(self):
+                super().__init__()
+                self._last_reload = 0.0
+
+            def _maybe_reload(self, path: str) -> None:
+                if not str(path).endswith(".md"):
                     return
-                if str(event.src_path).endswith(".md"):
-                    log.info("skills changed (%s); reloading", event.src_path)
-                    try:
-                        engine.reload()
-                    except Exception:
-                        log.exception("hot reload failed")
+                now = time.monotonic()
+                # Editors typically save via rename, firing several events
+                # in quick succession. Debounce so one save = one reload.
+                if now - self._last_reload < 0.5:
+                    return
+                self._last_reload = now
+                log.info("skills changed (%s); reloading", path)
+                try:
+                    engine.reload()
+                except Exception:
+                    log.exception("hot reload failed")
+
+            def on_modified(self, event):
+                if not event.is_directory:
+                    self._maybe_reload(event.src_path)
+
+            def on_created(self, event):
+                if not event.is_directory:
+                    self._maybe_reload(event.src_path)
+
+            def on_deleted(self, event):
+                if not event.is_directory:
+                    self._maybe_reload(event.src_path)
+
+            def on_moved(self, event):
+                if not event.is_directory:
+                    self._maybe_reload(event.dest_path)
 
         observer = Observer()
         observer.schedule(_Handler(), str(self.skills.skills_dir), recursive=True)

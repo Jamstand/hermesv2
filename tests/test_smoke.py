@@ -101,6 +101,89 @@ def test_memory_fts_handles_special_chars(tmp_path: Path):
     assert "bashrc" in ctx
 
 
+def test_hot_reload_handler_ignores_open_close_events(tmp_path: Path):
+    """Regression: the watchdog handler used to subscribe via on_any_event,
+    which catches FileOpenedEvent / FileClosedEvent / FileClosedNoWriteEvent.
+    engine.reload() opens each .md file, firing those events, which fired
+    another reload — an infinite loop that filled the log at ~500 events/sec
+    on a live Pi.
+
+    The fix: subscribe only to modify/create/delete/move events.
+    """
+    from unittest.mock import MagicMock
+    from hermesv2.agent import HermesV2
+
+    # Drive the production code path that builds the handler, then capture it
+    # without starting a real watchdog Observer (which would spin a thread).
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    (skills_dir / "x.md").write_text(
+        "---\nname: x\ndescription: t\ntrigger: manual\n---\nbody",
+        encoding="utf-8",
+    )
+
+    captured = {}
+    class _ObserverStub:
+        def __init__(self): pass
+        def schedule(self, handler, path, recursive=False):
+            captured["handler"] = handler
+        def start(self): pass
+        def stop(self): pass
+        def join(self, timeout=None): pass
+
+    import hermesv2.agent as agent_module
+    orig_import = __import__
+    with patch("hermesv2.agent.HermesV2._start_hot_reload", autospec=True) as _:
+        pass  # noop — we'll call the real method below with a patched Observer
+
+    agent = HermesV2.__new__(HermesV2)
+    agent._hot_reload_observer = None
+    agent.skills = MagicMock()
+    agent.skills.skills_dir = skills_dir
+    agent.skills.reload = MagicMock()
+
+    # Monkey-patch the Observer at import time inside _start_hot_reload.
+    import watchdog.observers
+    with patch.object(watchdog.observers, "Observer", _ObserverStub):
+        HermesV2._start_hot_reload(agent)
+
+    handler = captured["handler"]
+    assert handler is not None, "handler should have been scheduled"
+
+    # The handler MUST NOT define on_any_event (that was the bug). The base
+    # FileSystemEventHandler does provide a default, but our subclass should
+    # rely on the discrete event methods instead.
+    assert "on_any_event" not in type(handler).__dict__, (
+        "regression: hot-reload handler subscribed to on_any_event again"
+    )
+
+    from watchdog.events import (
+        FileModifiedEvent, FileOpenedEvent, FileClosedEvent,
+        FileClosedNoWriteEvent,
+    )
+
+    md_path = str(skills_dir / "x.md")
+
+    # Read-only events MUST NOT trigger reload (the original infinite-loop cause)
+    for ev_cls in (FileOpenedEvent, FileClosedEvent, FileClosedNoWriteEvent):
+        try:
+            ev = ev_cls(md_path)
+        except TypeError:
+            ev = ev_cls(src_path=md_path)
+        handler.dispatch(ev)
+    assert agent.skills.reload.call_count == 0, (
+        "open/close events triggered a reload"
+    )
+
+    # A real modify event DOES trigger reload
+    handler.dispatch(FileModifiedEvent(md_path))
+    assert agent.skills.reload.call_count == 1
+
+    # And it debounces: a second rapid modify is ignored
+    handler.dispatch(FileModifiedEvent(md_path))
+    assert agent.skills.reload.call_count == 1
+
+
 # ---------------------------------------------------------------------------
 # 4. Skills engine loads built-in .md files
 # ---------------------------------------------------------------------------
