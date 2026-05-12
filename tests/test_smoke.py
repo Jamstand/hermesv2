@@ -254,7 +254,7 @@ def test_learner_propose_and_approve(tmp_path: Path):
     assert (auto_dir / "ping_check.md").exists() is False
     path = learner.approve(p.id)
     assert path.exists()
-    assert "name: ping_check" in path.read_text()
+    assert "name: ping_check" in path.read_text(encoding="utf-8")
     assert se.get("ping_check") is not None
 
 
@@ -295,7 +295,7 @@ def test_no_anthropic_sdk():
         "Anthropic(",
     )
     for py in repo.rglob("*.py"):
-        source = py.read_text()
+        source = py.read_text(encoding="utf-8")
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
         stripped: list[str] = []
         for tok in tokens:

@@ -118,7 +118,7 @@ def _check_config(path: Path) -> tuple[bool, str]:
     if not path.exists():
         return False, f"{path} missing — copy from config.example.yaml"
     try:
-        yaml.safe_load(path.read_text())
+        yaml.safe_load(path.read_text(encoding="utf-8"))
         return True, str(path)
     except yaml.YAMLError as e:
         return False, f"invalid YAML: {e}"
@@ -165,7 +165,7 @@ def run_all(config_path: str = "config.yaml") -> bool:
     cfg: dict = {}
     if cfg_path.exists():
         try:
-            cfg = yaml.safe_load(cfg_path.read_text()) or {}
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError:
             cfg = {}
 

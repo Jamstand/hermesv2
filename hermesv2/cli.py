@@ -19,7 +19,7 @@ def _setup_logging(config_path: Path) -> None:
     try:
         import yaml
         if config_path.exists():
-            cfg = yaml.safe_load(config_path.read_text()) or {}
+            cfg = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
             log_dir = Path(cfg.get("agent", {}).get("log_dir", "logs"))
     except Exception:
         pass
@@ -95,7 +95,7 @@ def cmd_stop() -> None:
         return
     try:
         import os, signal
-        pid = int(pid_file.read_text().strip())
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
         os.kill(pid, signal.SIGTERM)
         console.print(f"sent SIGTERM to {pid}")
     except (OSError, ValueError) as e:
@@ -129,7 +129,7 @@ def cmd_setup(ctx: click.Context) -> None:
     target = ctx.obj["config_path"]
     example = Path("config.example.yaml")
     if not target.exists() and example.exists():
-        target.write_text(example.read_text())
+        target.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
         console.print(f"[green]created[/green] {target} from example")
     console.print("Next steps:")
     console.print("  1. [yellow]claude login[/yellow]   (authenticate Claude Max)")
@@ -144,7 +144,7 @@ def cmd_config(ctx: click.Context, do_print: bool) -> None:
     """Show or edit the active config."""
     path = ctx.obj["config_path"]
     if do_print or True:
-        console.print(path.read_text())
+        console.print(path.read_text(encoding="utf-8"))
 
 
 @main.group("skills")
