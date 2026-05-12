@@ -71,6 +71,36 @@ def test_memory_facts_and_fts(tmp_path: Path):
     assert "S15 Spec R" in ctx
 
 
+def test_memory_fts_handles_special_chars(tmp_path: Path):
+    """Regression: FTS5 parser used to choke on `~`, `/`, `.`, `@`, etc.
+
+    Any user-supplied string must not raise sqlite3.OperationalError; the
+    sanitizer should reduce arbitrary input to bareword tokens.
+    """
+    from hermesv2.memory import Memory
+    m = Memory(tmp_path / "mem.db")
+    m.add_message("u", "user", "edit ~/.bashrc to add the alias")
+
+    for hostile in [
+        "~/.bashrc:",
+        "look at ~/.bashrc and /etc/hosts",
+        "config @ /home/josh: bashrc",
+        '"-+*(){}^:',
+        "",
+        "   ",
+        "alias hermesv2='hermesv2 --config ~/hermesv2/config.yaml'",
+    ]:
+        m.search_messages("u", hostile)  # must not raise
+
+    # bareword inside a hostile string still matches normally
+    hits = m.search_messages("u", "~bashrc")
+    assert any("bashrc" in h["content"] for h in hits)
+
+    # build_context is the path that originally crashed the live agent
+    ctx = m.build_context("u", "edit ~/.bashrc to add the alias")
+    assert "bashrc" in ctx
+
+
 # ---------------------------------------------------------------------------
 # 4. Skills engine loads built-in .md files
 # ---------------------------------------------------------------------------

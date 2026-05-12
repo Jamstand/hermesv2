@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import threading
 import time
@@ -291,11 +292,16 @@ class Memory:
         }
 
 
+_FTS_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+
+
 def _sanitize_fts(query: str) -> str:
-    """Strip FTS5 syntax tokens that could break a user-supplied query."""
-    bad = set('"\'`()*:^+-')
-    cleaned = "".join(c if c not in bad else " " for c in query)
-    tokens = [t for t in cleaned.split() if t]
-    if not tokens:
-        return ""
+    """Extract bareword tokens for an FTS5 MATCH query.
+
+    The FTS5 query parser errors on any character it doesn't recognize as a
+    bareword char or a syntax token (e.g. `~`, `/`, `.`, `@`). Pulling only
+    `\\w+` tokens out is the safest sanitization — it cannot produce a parser
+    error regardless of what the user typed.
+    """
+    tokens = _FTS_TOKEN_RE.findall(query)
     return " ".join(tokens)
